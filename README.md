@@ -73,7 +73,7 @@ npm install
 
 3. Configure environment variables in .env:
 
-```json
+```js
 PORT=5000
 DB_HOST=localhost
 DB_PORT=27017
