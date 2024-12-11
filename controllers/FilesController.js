@@ -1,54 +1,53 @@
 import { ObjectID } from 'mongodb';
-import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
 
 class FilesController {
   static async postUpload(req, res) {
     try {
-      // Get user token
+      // Get token and verify user
       const token = req.header('X-Token');
       if (!token) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      // Get user based on token
-      const userId = await redisClient.get(`auth_${token}`);
+      const key = `auth_${token}`;
+      const userId = await redisClient.get(key);
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      // Check user exists
+      // Check if user exists
       const user = await dbClient.db.collection('users').findOne({ _id: ObjectID(userId) });
       if (!user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      // Get file info from request
-      const { name, type, data } = req.body;
-      let { parentId, isPublic } = req.body;
+      // Validate request body
+      const {
+        name, type, parentId = 0, isPublic = false, data,
+      } = req.body;
 
-      // Set defaults
-      if (parentId === undefined) parentId = 0;
-      if (isPublic === undefined) isPublic = false;
-
-      // Validate required fields
+      // Validate name
       if (!name) {
         return res.status(400).json({ error: 'Missing name' });
       }
 
+      // Validate type
       const validTypes = ['folder', 'file', 'image'];
       if (!type || !validTypes.includes(type)) {
         return res.status(400).json({ error: 'Missing type' });
       }
 
+      // Validate data for non-folder types
       if (!data && type !== 'folder') {
         return res.status(400).json({ error: 'Missing data' });
       }
 
-      // Check parent folder if specified
+      // Check parentId if provided
       if (parentId !== 0) {
         const parent = await dbClient.db.collection('files').findOne({ _id: ObjectID(parentId) });
         if (!parent) {
@@ -60,59 +59,59 @@ class FilesController {
       }
 
       // Create file document
-      const newFile = {
+      const fileDoc = {
         userId: ObjectID(userId),
         name,
         type,
         isPublic,
-        parentId: parentId === 0 ? '0' : ObjectID(parentId)
+        parentId: parentId === 0 ? '0' : ObjectID(parentId),
       };
 
-      // Handle folder creation
+      // If type is folder, save and return
       if (type === 'folder') {
-        const result = await dbClient.db.collection('files').insertOne(newFile);
-        return res.status(201).json({
+        const result = await dbClient.db.collection('files').insertOne(fileDoc);
+        const file = {
           id: result.insertedId,
-          userId: newFile.userId,
-          name: newFile.name,
-          type: newFile.type,
-          isPublic: newFile.isPublic,
-          parentId: newFile.parentId
-        });
+          userId: fileDoc.userId,
+          name: fileDoc.name,
+          type: fileDoc.type,
+          isPublic: fileDoc.isPublic,
+          parentId: fileDoc.parentId,
+        };
+        return res.status(201).json(file);
       }
 
-      // Handle file/image creation
+      // Handle file storage
       const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
-      
-      // Create storage folder if it doesn't exist
       if (!fs.existsSync(folderPath)) {
         fs.mkdirSync(folderPath, { recursive: true });
       }
 
-      // Generate unique filename
+      // Save file to disk
       const filename = uuidv4();
       const localPath = path.join(folderPath, filename);
-
-      // Write file to disk
       const fileContent = Buffer.from(data, 'base64');
       await fs.promises.writeFile(localPath, fileContent);
 
-      // Save file document with local path
-      newFile.localPath = localPath;
-      const result = await dbClient.db.collection('files').insertOne(newFile);
+      // Add localPath to document
+      fileDoc.localPath = localPath;
 
-      // Return response
-      return res.status(201).json({
+      // Save to database
+      const result = await dbClient.db.collection('files').insertOne(fileDoc);
+
+      // Prepare response
+      const file = {
         id: result.insertedId,
-        userId: newFile.userId,
-        name: newFile.name,
-        type: newFile.type,
-        isPublic: newFile.isPublic,
-        parentId: newFile.parentId
-      });
+        userId: fileDoc.userId,
+        name: fileDoc.name,
+        type: fileDoc.type,
+        isPublic: fileDoc.isPublic,
+        parentId: fileDoc.parentId,
+      };
 
+      return res.status(201).json(file);
     } catch (error) {
-      console.error('Error:', error);
+      console.error(error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
