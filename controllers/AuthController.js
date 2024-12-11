@@ -23,9 +23,8 @@ class AuthController {
 
     const token = uuidv4();
     const key = `auth_${token}`;
-    const returnToken = `token: ${token}`;
     await redisClient.set(key, user._id.toString(), 86400);
-    return res.status(200).json({ returnToken });
+    return res.status(200).json({ token });
   }
 
   static async getDisconnect(req, res) {
