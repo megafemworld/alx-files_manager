@@ -13,14 +13,14 @@ class AuthController {
     const base64Credentials = authHeader.split(' ')[1];
     let credentials;
     try {
-      credentials = Buffer.from(base64Credentials, 'base64').toString();
+      credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
     } catch (error) {
       return res.status(401).json({ error: 'Invalid Base64 content' });
     }
 
     const [email, password] = credentials.split(':');
     if (!email || !password) {
-      return res.status(400).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const hashedPassword = sha1(password);
@@ -43,14 +43,14 @@ class AuthController {
     }
 
     const key = `auth_${token}`;
-    const userId = await redisClient.get(key);
+    const userId = await redisClient.get(`auth_${token}`);
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     await redisClient.del(key);
-    return res.status(204).send();
+    return res.status(204).end();
   }
 }
 
