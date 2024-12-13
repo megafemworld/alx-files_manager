@@ -17,12 +17,12 @@ class AuthController {
     } catch (error) {
       return res.status(400).json({ error: 'Invalid Base64 content' });
     }
-    
+
     const [email, password] = credentials.split(':');
     if (!email || !password) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
-    
+
     const hashedPassword = sha1(password);
     const user = await dbClient.db.collection('users').findOne({ email, password: hashedPassword });
 
