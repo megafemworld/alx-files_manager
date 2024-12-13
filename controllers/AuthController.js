@@ -15,7 +15,7 @@ class AuthController {
     try {
       credentials = Buffer.from(base64Credentials, 'base64').toString();
     } catch (error) {
-      return res.status(400).json({ error: 'Invalid Base64 content' });
+      return res.status(401).json({ error: 'Invalid Base64 content' });
     }
 
     const [email, password] = credentials.split(':');
