@@ -13,7 +13,7 @@ class AuthController {
     const base64Credentials = authHeader.split(' ')[1];
     let credentials;
     try {
-      credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
+      credentials = Buffer.from(base64Credentials, 'base64').toString();
     } catch (error) {
       return res.status(400).json({ error: 'Invalid Base64 content' });
     }
