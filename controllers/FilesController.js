@@ -23,7 +23,9 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { name, type, parentId = 0, isPublic = false, data } = req.body;
+    const {
+      name, type, parentId = 0, isPublic = false, data,
+    } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Missing name' });
@@ -115,9 +117,14 @@ class FilesController {
 
     const { parentId = 0, page = 0 } = req.query;
     const files = await dbClient.db.collection('files').aggregate([
-      { $match: { userId: ObjectId(userId), parentId: parentId === 0 ? parentId : ObjectId(parentId) } },
+      {
+        $match: {
+          userId: ObjectId(userId),
+          parentId: parentId === 0 ? parentId : ObjectId(parentId),
+        },
+      },
       { $skip: page * 20 },
-      { $limit: 20 }
+      { $limit: 20 },
     ]).toArray();
 
     return res.status(200).json(files);
