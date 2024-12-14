@@ -18,25 +18,18 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Check if user exists
     const user = await dbClient.db.collection('users').findOne({ _id: ObjectId(userId) });
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Validate request body
-    const {
-      name, type, parentId = 0, isPublic = false, data,
-    } = req.body;
+    const { name, type, parentId = 0, isPublic = false, data } = req.body;
 
-    // Validate name
     if (!name) {
       return res.status(400).json({ error: 'Missing name' });
     }
 
-    // Validate type
     const validTypes = ['folder', 'file', 'image'];
-
     if (!type || !validTypes.includes(type)) {
       return res.status(400).json({ error: 'Missing type' });
     }
@@ -86,6 +79,48 @@ class FilesController {
     fileDocument.localPath = localPath;
     const result = await dbClient.db.collection('files').insertOne(fileDocument);
     return res.status(201).json({ id: result.insertedId, ...fileDocument });
+  }
+
+  static async getShow(req, res) {
+    const token = req.headers['x-token'];
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const key = `auth_${token}`;
+    const userId = await redisClient.get(key);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const file = await dbClient.db.collection('files').findOne({ _id: ObjectId(req.params.id), userId: ObjectId(userId) });
+    if (!file) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    return res.status(200).json(file);
+  }
+
+  static async getIndex(req, res) {
+    const token = req.headers['x-token'];
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const key = `auth_${token}`;
+    const userId = await redisClient.get(key);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { parentId = 0, page = 0 } = req.query;
+    const files = await dbClient.db.collection('files').aggregate([
+      { $match: { userId: ObjectId(userId), parentId: parentId === 0 ? parentId : ObjectId(parentId) } },
+      { $skip: page * 20 },
+      { $limit: 20 }
+    ]).toArray();
+
+    return res.status(200).json(files);
   }
 }
 
