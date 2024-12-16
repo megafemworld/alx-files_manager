@@ -98,7 +98,7 @@ class FilesController {
       const fileId = req.params.id;
       const file = await dbClient.db.collection('files').findOne({
         _id: ObjectId(fileId),
-        userId: ObjectId(userId)
+        userId: ObjectId(userId),
       });
 
       if (!file) {
@@ -111,7 +111,7 @@ class FilesController {
         name: file.name,
         type: file.type,
         isPublic: file.isPublic,
-        parentId: file.parentId
+        parentId: file.parentId,
       });
     } catch (error) {
       return res.status(404).json({ error: 'Not found' });
@@ -131,7 +131,7 @@ class FilesController {
 
     try {
       const page = parseInt(req.query.page, 10) || 0;
-      let parentId = req.query.parentId || '0';
+      const parentId = req.query.parentId || '0';
 
       const query = { userId: ObjectId(userId) };
 
@@ -157,9 +157,9 @@ class FilesController {
             name: 1,
             type: 1,
             isPublic: 1,
-            parentId: 1
-          }
-        }
+            parentId: 1,
+          },
+        },
       ];
 
       const files = await dbClient.db.collection('files')
@@ -167,13 +167,13 @@ class FilesController {
         .toArray();
 
       // Transform _id to id in the response
-      const formattedFiles = files.map(file => ({
+      const formattedFiles = files.map((file) => ({
         id: file.id,
         userId: file.userId,
         name: file.name,
         type: file.type,
         isPublic: file.isPublic,
-        parentId: file.parentId
+        parentId: file.parentId,
       }));
 
       return res.status(200).json(formattedFiles);
