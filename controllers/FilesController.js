@@ -28,16 +28,16 @@ class FilesController {
     } = req.body;
 
     if (!name) {
-      return res.status(400).json({ error: 'Missing name' });
+      return res.status(400).json({ error: 'Not found' });
     }
 
     const validTypes = ['folder', 'file', 'image'];
     if (!type || !validTypes.includes(type)) {
-      return res.status(400).json({ error: 'Missing type' });
+      return res.status(400).json({ error: 'Not found' });
     }
 
     if (!data && type !== 'folder') {
-      return res.status(400).json({ error: 'Missing data' });
+      return res.status(400).json({ error: 'Not found' });
     }
 
     if (parentId !== 0) {
@@ -116,7 +116,8 @@ class FilesController {
     }
 
     const { parentId = 0, page = 0 } = req.query;
-    const files = await dbClient.db.collection('files').aggregate([
+    const files = await dbClient.db.collection('files')
+    .aggregate([
       {
         $match:
         { userId: ObjectId(userId), parentId: parentId === 0 ? parentId : ObjectId(parentId) },
