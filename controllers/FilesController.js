@@ -84,13 +84,11 @@ class FilesController {
   }
 
   static async getShow(req, res) {
-  // Get token from request header
     const token = req.headers['x-token'];
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get user ID from Redis
     const userId = await redisClient.get(`auth_${token}`);
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -98,18 +96,12 @@ class FilesController {
 
     try {
       const fileId = req.params.id;
-
-      // First find the file
       const file = await dbClient.db.collection('files').findOne({
         _id: ObjectId(fileId),
+        userId: ObjectId(userId)
       });
 
       if (!file) {
-        return res.status(404).json({ error: 'Not found' });
-      }
-
-      // Then check if the user owns the file
-      if (file.userId.toString() !== userId) {
         return res.status(404).json({ error: 'Not found' });
       }
 
@@ -119,7 +111,7 @@ class FilesController {
         name: file.name,
         type: file.type,
         isPublic: file.isPublic,
-        parentId: file.parentId,
+        parentId: file.parentId
       });
     } catch (error) {
       return res.status(404).json({ error: 'Not found' });
@@ -127,13 +119,11 @@ class FilesController {
   }
 
   static async getIndex(req, res) {
-    // Get token from request header
     const token = req.headers['x-token'];
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get user ID from Redis
     const userId = await redisClient.get(`auth_${token}`);
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -141,44 +131,49 @@ class FilesController {
 
     try {
       const page = parseInt(req.query.page, 10) || 0;
-      const parentId = req.query.parentId || '0';
+      let parentId = req.query.parentId || '0';
 
-      // Build base query
       const query = { userId: ObjectId(userId) };
 
-      // Handle parentId
       if (parentId === '0') {
         query.parentId = 0;
       } else {
         try {
-          // Verify if parent exists
-          const parent = await dbClient.db.collection('files').findOne({
-            _id: ObjectId(parentId),
-          });
-          if (!parent) {
-            return res.status(200).json([]);
-          }
           query.parentId = ObjectId(parentId);
         } catch (error) {
           return res.status(200).json([]);
         }
       }
 
-      // Execute paginated query
+      const pipeline = [
+        { $match: query },
+        { $skip: page * 20 },
+        { $limit: 20 },
+        {
+          $project: {
+            _id: 0,
+            id: '$_id',
+            userId: 1,
+            name: 1,
+            type: 1,
+            isPublic: 1,
+            parentId: 1
+          }
+        }
+      ];
+
       const files = await dbClient.db.collection('files')
-        .find(query)
-        .skip(page * 20)
-        .limit(20)
+        .aggregate(pipeline)
         .toArray();
 
-      // Format response
-      const formattedFiles = files.map((file) => ({
-        id: file._id,
+      // Transform _id to id in the response
+      const formattedFiles = files.map(file => ({
+        id: file.id,
         userId: file.userId,
         name: file.name,
         type: file.type,
         isPublic: file.isPublic,
-        parentId: file.parentId,
+        parentId: file.parentId
       }));
 
       return res.status(200).json(formattedFiles);
