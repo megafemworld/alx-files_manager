@@ -84,7 +84,7 @@ class FilesController {
   }
 
   static async getShow(req, res) {
-    // Get token from request header
+  // Get token from request header
     const token = req.headers['x-token'];
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -97,27 +97,32 @@ class FilesController {
     }
 
     try {
-      // Find file by ID
       const fileId = req.params.id;
+      
+      // First find the file
       const file = await dbClient.db.collection('files').findOne({
-        _id: ObjectId(fileId),
+        _id: ObjectId(fileId)
       });
 
       if (!file) {
         return res.status(404).json({ error: 'Not found' });
       }
 
-      // Format response
+      // Then check if the user owns the file
+      if (file.userId.toString() !== userId) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
       return res.status(200).json({
         id: file._id,
         userId: file.userId,
         name: file.name,
         type: file.type,
         isPublic: file.isPublic,
-        parentId: file.parentId,
+        parentId: file.parentId
       });
     } catch (error) {
-      return res.status(404).json({ error: 'Not found' });
+        return res.status(404).json({ error: 'Not found' });
     }
   }
 
@@ -134,24 +139,32 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get pagination parameters
-    const page = parseInt(req.query.page, 10) || 0;
-    const parentId = req.query.parentId || '0';
-
     try {
-      // Build query
-      const query = {
-        userId: ObjectId(userId),
-      };
+      const page = parseInt(req.query.page, 10) || 0;
+      const parentId = req.query.parentId || '0';
 
-      // Add parentId to query if it's not 0
-      if (parentId !== '0') {
-        query.parentId = ObjectId(parentId);
-      } else {
+      // Build base query
+      const query = { userId: ObjectId(userId) };
+
+      // Handle parentId
+      if (parentId === '0') {
         query.parentId = 0;
+      } else {
+        try {
+          // Verify if parent exists
+          const parent = await dbClient.db.collection('files').findOne({
+            _id: ObjectId(parentId)
+          });
+          if (!parent) {
+            return res.status(200).json([]);
+          }
+          query.parentId = ObjectId(parentId);
+        } catch (error) {
+          return res.status(200).json([]);
+        }
       }
 
-      // Execute query with pagination
+      // Execute paginated query
       const files = await dbClient.db.collection('files')
         .find(query)
         .skip(page * 20)
@@ -165,15 +178,15 @@ class FilesController {
         name: file.name,
         type: file.type,
         isPublic: file.isPublic,
-        parentId: file.parentId,
+        parentId: file.parentId
       }));
 
       return res.status(200).json(formattedFiles);
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Internal server error' });
+      return res.status(200).json([]);
     }
-  }
+  }  
 }
 
 export default FilesController;
