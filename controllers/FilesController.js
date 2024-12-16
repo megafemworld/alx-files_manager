@@ -94,28 +94,30 @@ class FilesController {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    let fileId;
     try {
-      const fileId = req.params.id;
-      const file = await dbClient.db.collection('files').findOne({
-        _id: ObjectId(fileId),
-        userId: ObjectId(userId),
-      });
-
-      if (!file) {
-        return res.status(404).json({ error: 'Not found' });
-      }
-
-      return res.status(200).json({
-        id: file._id,
-        userId: file.userId,
-        name: file.name,
-        type: file.type,
-        isPublic: file.isPublic,
-        parentId: file.parentId,
-      });
-    } catch (error) {
+      fileId = ObjectId(req.params.id);
+    } catch (err) {
       return res.status(404).json({ error: 'Not found' });
     }
+
+    const file = await dbClient.db.collection('files').findOne({
+      _id: fileId,
+      userId: ObjectId(userId),
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    return res.status(200).json({
+      id: file._id,
+      userId: file.userId,
+      name: file.name,
+      type: file.type,
+      isPublic: file.isPublic,
+      parentId: file.parentId,
+    });
   }
 
   static async getIndex(req, res) {
@@ -135,40 +137,37 @@ class FilesController {
 
       const query = { userId: ObjectId(userId) };
 
+      // Handle parentId cases
       if (parentId === '0') {
-        query.parentId = 0;
+        query.parentId = 0; // Root directory
       } else {
         try {
+          const parent = await dbClient.db.collection('files').findOne({
+            _id: ObjectId(parentId),
+            userId: ObjectId(userId),
+          });
+
+          // If parent doesn't exist, return empty array
+          if (!parent) {
+            return res.status(200).json([]);
+          }
+
+          // If parent exists, look for its children
           query.parentId = ObjectId(parentId);
         } catch (error) {
+          // If parentId is invalid ObjectId, return empty array
           return res.status(200).json([]);
         }
       }
 
-      const pipeline = [
-        { $match: query },
-        { $skip: page * 20 },
-        { $limit: 20 },
-        {
-          $project: {
-            _id: 0,
-            id: '$_id',
-            userId: 1,
-            name: 1,
-            type: 1,
-            isPublic: 1,
-            parentId: 1,
-          },
-        },
-      ];
-
       const files = await dbClient.db.collection('files')
-        .aggregate(pipeline)
+        .find(query)
+        .skip(page * 20)
+        .limit(20)
         .toArray();
 
-      // Transform _id to id in the response
       const formattedFiles = files.map((file) => ({
-        id: file.id,
+        id: file._id,
         userId: file.userId,
         name: file.name,
         type: file.type,
