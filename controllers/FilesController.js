@@ -104,29 +104,38 @@ class FilesController {
   }
 
   static async getIndex(req, res) {
-    const token = req.headers['x-token'];
-    if (!token) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    try {
+      const token = req.headers['x-token'];
+      if (!token) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const key = `auth_${token}`;
+      const userId = await redisClient.get(key);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const { parentId, page = 0 } = req.query;
+      const parentIdQuery = parentId ? ObjectId(parentId) : 0;
+      const pageNum = parseInt(page, 10) || 0;
+
+      const files = await dbClient.db.collection('files')
+        .aggregate([
+          {
+            $match: {
+              userId: ObjectId(userId),
+              parentId: parentIdQuery,
+            },
+          },
+          { $skip: pageNum * 20 },
+          { $limit: 20 },
+        ]).toArray();
+
+      return res.status(200).json(files);
+    } catch (error) {
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
-
-    const key = `auth_${token}`;
-    const userId = await redisClient.get(key);
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { parentId = 0, page = 0 } = req.query;
-    const files = await dbClient.db.collection('files')
-    .aggregate([
-      {
-        $match:
-        { userId: ObjectId(userId), parentId: parentId === 0 ? parentId : ObjectId(parentId) },
-      },
-      { $skip: page * 20 },
-      { $limit: 20 },
-    ]).toArray();
-
-    return res.status(200).json(files);
   }
 }
 
