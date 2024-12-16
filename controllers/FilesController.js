@@ -98,10 +98,10 @@ class FilesController {
 
     try {
       const fileId = req.params.id;
-      
+
       // First find the file
       const file = await dbClient.db.collection('files').findOne({
-        _id: ObjectId(fileId)
+        _id: ObjectId(fileId),
       });
 
       if (!file) {
@@ -119,10 +119,10 @@ class FilesController {
         name: file.name,
         type: file.type,
         isPublic: file.isPublic,
-        parentId: file.parentId
+        parentId: file.parentId,
       });
     } catch (error) {
-        return res.status(404).json({ error: 'Not found' });
+      return res.status(404).json({ error: 'Not found' });
     }
   }
 
@@ -153,7 +153,7 @@ class FilesController {
         try {
           // Verify if parent exists
           const parent = await dbClient.db.collection('files').findOne({
-            _id: ObjectId(parentId)
+            _id: ObjectId(parentId),
           });
           if (!parent) {
             return res.status(200).json([]);
@@ -178,7 +178,7 @@ class FilesController {
         name: file.name,
         type: file.type,
         isPublic: file.isPublic,
-        parentId: file.parentId
+        parentId: file.parentId,
       }));
 
       return res.status(200).json(formattedFiles);
@@ -186,7 +186,7 @@ class FilesController {
       console.error(error);
       return res.status(200).json([]);
     }
-  }  
+  }
 }
 
 export default FilesController;
